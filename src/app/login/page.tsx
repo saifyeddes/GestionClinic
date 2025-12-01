@@ -26,6 +26,7 @@ export default function LoginPage() {
       });
 
       const data = await res.json().catch(() => null);
+      console.log("Réponse du backend:", data);
       if (!res.ok) {
         throw new Error(data?.message ?? "Échec de la connexion");
       }
@@ -37,11 +38,12 @@ export default function LoginPage() {
 
       const role = data.user?.role as string | undefined;
       let redirect = "/";
-      if (role === "ADMIN") redirect = "/dashboard/admin";
+      if (role === "ADMIN") redirect = "/admin";
       else if (role === "DOCTOR") redirect = "/dashboard/doctor";
-      else if (role === "RECEPTIONIST") redirect = "/dashboard/receptionist";
-      else if (role === "PATIENT") redirect = "/dashboard/patient";
+      else if (role === "RECEPTIONIST") redirect = "/receptionist";
+      else if (role === "PATIENT") redirect = "/patient";
       
+      console.log("Redirection vers:", redirect, "pour le rôle:", role);
       router.push(redirect);
     } catch (err: any) {
       setError(err.message ?? "Échec de la connexion");
@@ -51,7 +53,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 flex items-center justify-center px-4">
+    <main className="min-h-screen bg-linear-to-br from-blue-50 via-white to-indigo-100 flex items-center justify-center px-4">
       <div className="max-w-5xl w-full grid gap-8 md:grid-cols-[1.2fr,1fr] items-center">
         {/* Section gauche - Informations */}
         <section className="space-y-6">
@@ -71,19 +73,19 @@ export default function LoginPage() {
             <h3 className="font-semibold text-gray-800">Pourquoi choisir notre plateforme ?</h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
-                <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
                   <div className="w-2 h-2 rounded-full bg-blue-600"></div>
                 </div>
                 <span className="text-gray-700">Accès sécurisé basé sur les rôles</span>
               </li>
               <li className="flex items-start gap-3">
-                <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
                   <div className="w-2 h-2 rounded-full bg-blue-600"></div>
                 </div>
                 <span className="text-gray-700">Gestion des rendez-vous en temps réel</span>
               </li>
               <li className="flex items-start gap-3">
-                <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
                   <div className="w-2 h-2 rounded-full bg-blue-600"></div>
                 </div>
                 <span className="text-gray-700">Centralisation des données patients</span>
@@ -181,7 +183,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-lg"
+              className="w-full bg-linear-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-lg"
             >
               {loading ? "Connexion en cours..." : "Se connecter"}
             </button>

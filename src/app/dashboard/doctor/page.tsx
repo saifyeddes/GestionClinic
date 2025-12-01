@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, Clock, Stethoscope, CheckCircle, RefreshCw, AlertCircle, FileText, Edit, Eye, XCircle, Search, Users, User, Mail, Phone } from "lucide-react"
+import { Calendar, Clock, User, Phone, Mail, Stethoscope, Search, Edit, Trash2, Eye, CheckCircle, XCircle, AlertCircle, Users, BarChart3, Shield, Plus, RefreshCw, Building, Settings, Activity, FileText, TrendingUp, UserCheck, CalendarDays, CreditCard, Download, Heart, ClipboardList, Pill } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,38 +19,40 @@ interface Appointment {
   notes?: string
   symptoms?: string
   duration: number
+  doctor: {
+    id: string
+    fullName: string
+    email: string
+    specialization?: string
+  }
   patient: {
     id: string
     fullName: string
     email: string
     phone?: string
-    dateOfBirth: string
-    address: string
-    bloodType?: string
-    allergies?: string
-    chronicDiseases?: string
+  }
+  createdBy: {
+    id: string
+    fullName: string
   }
   createdAt: string
 }
 
 interface MedicalRecord {
   id: string
+  patientId: string
+  doctorId: string
   diagnosis: string
-  treatment?: string
+  treatment: string
+  notes?: string
   prescription?: string
-  observations?: string
-  recommendations?: string
-  bloodPressure?: string
-  heartRate?: number
-  temperature?: number
-  weight?: number
-  height?: number
+  createdAt: string
+  updatedAt: string
   patient: {
-    id: string
     fullName: string
     email: string
+    dateOfBirth: string
   }
-  createdAt: string
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
@@ -62,24 +64,12 @@ export default function DoctorInterface() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
-  const [showMedicalRecordForm, setShowMedicalRecordForm] = useState(false)
-  const [medicalRecordForm, setMedicalRecordForm] = useState({
-    diagnosis: "",
-    treatment: "",
-    prescription: "",
-    observations: "",
-    recommendations: "",
-    bloodPressure: "",
-    heartRate: "",
-    temperature: "",
-    weight: "",
-    height: ""
-  })
+  const [doctorInfo, setDoctorInfo] = useState<any>(null)
   const [stats, setStats] = useState({
     todayAppointments: 0,
     completedAppointments: 0,
     totalPatients: 0,
-    pendingAppointments: 0
+    upcomingAppointments: 0
   })
 
   useEffect(() => {
@@ -96,47 +86,40 @@ export default function DoctorInterface() {
         "Content-Type": "application/json"
       }
 
-      // Get current user info to find doctor ID
-      const userRes = await fetch(`${API_URL}/auth/profile`, { headers })
-      if (!userRes.ok) return
-      
-      const userData = await userRes.json()
-      const doctorId = userData.id
+      // Get doctor info
+      const doctorRes = await fetch(`${API_URL}/auth/me`, { headers })
+      if (doctorRes.ok) {
+        const doctorData = await doctorRes.json()
+        setDoctorInfo(doctorData)
+      }
 
-      // Fetch doctor's appointments
-      const appointmentsRes = await fetch(`${API_URL}/appointments/doctor/${doctorId}`, { headers })
+      // Get appointments
+      const appointmentsRes = await fetch(`${API_URL}/appointments`, { headers })
       if (appointmentsRes.ok) {
         const appointmentsData = await appointmentsRes.json()
         setAppointments(appointmentsData)
-        
-        // Calculate stats
-        const today = new Date()
-        const todayAppointments = appointmentsData.filter((apt: Appointment) => {
-          const aptDate = new Date(apt.appointmentDate)
-          return aptDate.toDateString() === today.toDateString()
-        })
-        
-        const completedAppointments = appointmentsData.filter((apt: Appointment) => apt.status === "COMPLETED")
-        const pendingAppointments = appointmentsData.filter((apt: Appointment) => 
-          apt.status === "SCHEDULED" || apt.status === "CONFIRMED"
-        )
-        
-        const uniquePatients = new Set(appointmentsData.map((apt: Appointment) => apt.patient.id))
-
-        setStats({
-          todayAppointments: todayAppointments.length,
-          completedAppointments: completedAppointments.length,
-          totalPatients: uniquePatients.size,
-          pendingAppointments: pendingAppointments.length
-        })
       }
 
-      // Fetch medical records created by this doctor
-      const recordsRes = await fetch(`${API_URL}/medical-records/doctor/${doctorId}`, { headers })
+      // Get medical records
+      const recordsRes = await fetch(`${API_URL}/medical-records`, { headers })
       if (recordsRes.ok) {
         const recordsData = await recordsRes.json()
         setMedicalRecords(recordsData)
       }
+
+      // Calculate stats
+      const today = new Date().toISOString().split('T')[0]
+      const todayAppointments = appointments.filter(apt => apt.appointmentDate.startsWith(today)).length
+      const completedAppointments = appointments.filter(apt => apt.status === 'COMPLETED').length
+      const upcomingAppointments = appointments.filter(apt => apt.status === 'SCHEDULED' || apt.status === 'CONFIRMED').length
+      const uniquePatients = new Set(appointments.map(apt => apt.patient.id)).size
+
+      setStats({
+        todayAppointments,
+        completedAppointments,
+        totalPatients: uniquePatients,
+        upcomingAppointments
+      })
     } catch (error) {
       console.error("Error fetching doctor data:", error)
     } finally {
@@ -144,7 +127,7 @@ export default function DoctorInterface() {
     }
   }
 
-  const filteredAppointments = appointments.filter(appointment => {
+  const filteredAppointments = appointments.filter((appointment) => {
     const matchesSearch = appointment.patient.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          appointment.patient.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          appointment.patient.phone?.includes(searchTerm)
@@ -155,11 +138,13 @@ export default function DoctorInterface() {
   const updateAppointmentStatus = async (id: string, status: Appointment["status"]) => {
     try {
       const token = localStorage.getItem("clinic_token")
+      if (!token) return
+
       const response = await fetch(`${API_URL}/appointments/${id}/status`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status })
       })
@@ -171,70 +156,22 @@ export default function DoctorInterface() {
         if (selectedAppointment?.id === id) {
           setSelectedAppointment(prev => prev ? { ...prev, status } : null)
         }
-        fetchDoctorData() // Refresh stats
       }
     } catch (error) {
       console.error("Error updating appointment status:", error)
     }
   }
 
-  const createMedicalRecord = async (appointmentId: string) => {
-    try {
-      const token = localStorage.getItem("clinic_token")
-      const userRes = await fetch(`${API_URL}/auth/profile`, { headers: { "Authorization": `Bearer ${token}` } })
-      const userData = await userRes.json()
-      
-      const medicalRecordData = {
-        ...medicalRecordForm,
-        patientId: selectedAppointment?.patient.id,
-        doctorId: userData.id,
-        heartRate: medicalRecordForm.heartRate ? parseInt(medicalRecordForm.heartRate) : undefined,
-        temperature: medicalRecordForm.temperature ? parseFloat(medicalRecordForm.temperature) : undefined,
-        weight: medicalRecordForm.weight ? parseFloat(medicalRecordForm.weight) : undefined,
-        height: medicalRecordForm.height ? parseFloat(medicalRecordForm.height) : undefined
-      }
-
-      const response = await fetch(`${API_URL}/medical-records`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(medicalRecordData)
-      })
-
-      if (response.ok) {
-        setShowMedicalRecordForm(false)
-        setMedicalRecordForm({
-          diagnosis: "",
-          treatment: "",
-          prescription: "",
-          observations: "",
-          recommendations: "",
-          bloodPressure: "",
-          heartRate: "",
-          temperature: "",
-          weight: "",
-          height: ""
-        })
-        fetchDoctorData()
-        updateAppointmentStatus(appointmentId, "COMPLETED")
-      }
-    } catch (error) {
-      console.error("Error creating medical record:", error)
-    }
-  }
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "CONFIRMED": 
-      case "COMPLETED":
+      case "COMPLETED": 
         return "text-green-600 bg-green-50"
       case "SCHEDULED":
       case "IN_PROGRESS": 
         return "text-blue-600 bg-blue-50"
       case "CANCELLED":
-      case "NO_SHOW":
+      case "NO_SHOW": 
         return "text-red-600 bg-red-50"
       default: 
         return "text-yellow-600 bg-yellow-50"
@@ -244,13 +181,13 @@ export default function DoctorInterface() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "CONFIRMED": 
-      case "COMPLETED":
+      case "COMPLETED": 
         return <CheckCircle className="h-4 w-4" />
       case "SCHEDULED":
       case "IN_PROGRESS": 
         return <AlertCircle className="h-4 w-4" />
       case "CANCELLED":
-      case "NO_SHOW":
+      case "NO_SHOW": 
         return <XCircle className="h-4 w-4" />
       default: 
         return <AlertCircle className="h-4 w-4" />
@@ -293,69 +230,102 @@ export default function DoctorInterface() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-emerald-50 to-teal-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-3">
-            <Stethoscope className="h-10 w-10 text-emerald-600" />
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Espace Médecin</h1>
-              <p className="text-gray-600">Clinique Santé Plus - Gestion médicale</p>
+    <div className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-teal-50">
+      {/* Header Médecin */}
+      <div className="bg-white border-b border-emerald-100 shadow-sm">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="bg-linear-to-br from-emerald-500 to-teal-600 p-3 rounded-xl shadow-lg">
+                <Stethoscope className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-linear-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Espace Médecin</h1>
+                <p className="text-gray-600">Plateforme médicale - Clinique Santé Plus</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200">
+                <span className="text-sm text-emerald-600 font-medium">Dr. {doctorInfo?.fullName || 'Médecin'}</span>
+              </div>
+              <Button onClick={fetchDoctorData} variant="outline" size="sm" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Actualiser
+              </Button>
             </div>
           </div>
-          <Button onClick={fetchDoctorData} variant="outline" className="flex items-center gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Actualiser
-          </Button>
         </div>
+      </div>
 
+      <div className="container mx-auto px-4 py-8">
+        {/* Cartes de statistiques médicales */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
+          <Card className="bg-linear-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Rendez-vous aujourd'hui</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.todayAppointments}</p>
+                  <p className="text-emerald-100 text-sm">Rendez-vous Aujourd'hui</p>
+                  <p className="text-3xl font-bold mt-1">{stats.todayAppointments}</p>
                 </div>
-                <Calendar className="h-8 w-8 text-emerald-600" />
+                <CalendarDays className="h-10 w-10 text-emerald-200" />
+              </div>
+              <div className="mt-4 flex items-center text-emerald-100 text-sm">
+                <Activity className="h-4 w-4 mr-1" />
+                <span>À venir</span>
               </div>
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="bg-linear-to-br from-teal-500 to-teal-600 text-white border-0 shadow-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Consultations terminées</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.completedAppointments}</p>
+                  <p className="text-teal-100 text-sm">Dossiers Médicaux</p>
+                  <p className="text-3xl font-bold mt-1">{medicalRecords.length}</p>
                 </div>
-                <CheckCircle className="h-8 w-8 text-green-600" />
+                <FileText className="h-10 w-10 text-teal-200" />
+              </div>
+              <div className="mt-4 flex items-center text-teal-100 text-sm">
+                <TrendingUp className="h-4 w-4 mr-1" />
+                <span>Ce mois</span>
               </div>
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="bg-linear-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Patients uniques</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalPatients}</p>
+                  <p className="text-blue-100 text-sm">Patients Actifs</p>
+                  <p className="text-3xl font-bold mt-1">{stats.totalPatients}</p>
                 </div>
-                <Users className="h-8 w-8 text-blue-600" />
+                <UserCheck className="h-10 w-10 text-blue-200" />
+              </div>
+              <div className="mt-4 flex items-center text-blue-100 text-sm">
+                <Heart className="h-4 w-4 mr-1" />
+                <span>Suivi</span>
               </div>
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="bg-linear-to-br from-purple-500 to-purple-600 text-white border-0 shadow-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">En attente</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.pendingAppointments}</p>
+                  <p className="text-purple-100 text-sm">Consultations</p>
+                  <p className="text-3xl font-bold mt-1">{stats.completedAppointments}</p>
                 </div>
-                <Clock className="h-8 w-8 text-orange-600" />
+                <ClipboardList className="h-10 w-10 text-purple-200" />
+              </div>
+              <div className="mt-4 flex items-center text-purple-100 text-sm">
+                <CheckCircle className="h-4 w-4 mr-1" />
+                <span>Terminées</span>
               </div>
             </CardContent>
           </Card>
         </div>
 
+        {/* Onglets de gestion médicale */}
         <Tabs defaultValue="appointments" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="appointments">Rendez-vous</TabsTrigger>
@@ -370,7 +340,7 @@ export default function DoctorInterface() {
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
-                        placeholder="Rechercher par patient..."
+                        placeholder="Rechercher un patient..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10"
@@ -431,10 +401,10 @@ export default function DoctorInterface() {
                             </div>
                           </td>
                           <td className="p-2">
-                            {new Date(appointment.appointmentDate).toLocaleDateString('fr-FR')}
+                            <span className="text-xs text-gray-500">{new Date(appointment.appointmentDate).toLocaleDateString('fr-FR')}</span>
                           </td>
                           <td className="p-2">
-                            {new Date(appointment.appointmentDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            <span className="text-xs text-gray-500">{new Date(appointment.appointmentDate).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                           </td>
                           <td className="p-2">
                             <span className="text-sm">{getTypeText(appointment.type)}</span>
@@ -454,27 +424,34 @@ export default function DoctorInterface() {
                               >
                                 <Eye className="h-3 w-3" />
                               </Button>
+                              {appointment.status === "SCHEDULED" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateAppointmentStatus(appointment.id, "CONFIRMED")}
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <CheckCircle className="h-3 w-3" />
+                                </Button>
+                              )}
                               {appointment.status === "CONFIRMED" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => updateAppointmentStatus(appointment.id, "IN_PROGRESS")}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  className="text-blue-600 hover:text-blue-700"
                                 >
-                                  Démarrer
+                                  <AlertCircle className="h-3 w-3" />
                                 </Button>
                               )}
                               {appointment.status === "IN_PROGRESS" && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => {
-                                    setSelectedAppointment(appointment)
-                                    setShowMedicalRecordForm(true)
-                                  }}
-                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  onClick={() => updateAppointmentStatus(appointment.id, "COMPLETED")}
+                                  className="text-green-600 hover:text-green-700"
                                 >
-                                  <FileText className="h-3 w-3" />
+                                  <CheckCircle className="h-3 w-3" />
                                 </Button>
                               )}
                             </div>
@@ -491,8 +468,16 @@ export default function DoctorInterface() {
           <TabsContent value="records" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Dossiers médicaux créés</CardTitle>
-                <CardDescription>Historique des consultations et diagnostics</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Dossiers Médicaux</CardTitle>
+                    <CardDescription>Consultez et gérez les dossiers patients</CardDescription>
+                  </div>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nouveau Dossier
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -500,6 +485,7 @@ export default function DoctorInterface() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-2">Patient</th>
+                        <th className="text-left p-2">Date de naissance</th>
                         <th className="text-left p-2">Diagnostic</th>
                         <th className="text-left p-2">Traitement</th>
                         <th className="text-left p-2">Date</th>
@@ -516,13 +502,16 @@ export default function DoctorInterface() {
                             </div>
                           </td>
                           <td className="p-2">
-                            <span className="text-sm truncate max-w-48 block">{record.diagnosis}</span>
+                            <span className="text-sm text-gray-600">{new Date(record.patient.dateOfBirth).toLocaleDateString('fr-FR')}</span>
                           </td>
                           <td className="p-2">
-                            <span className="text-sm truncate max-w-48 block">{record.treatment || "-"}</span>
+                            <span className="text-sm truncate max-w-32 block">{record.diagnosis}</span>
                           </td>
                           <td className="p-2">
-                            {new Date(record.createdAt).toLocaleDateString('fr-FR')}
+                            <span className="text-sm truncate max-w-32 block">{record.treatment}</span>
+                          </td>
+                          <td className="p-2">
+                            <span className="text-sm text-gray-500">{new Date(record.createdAt).toLocaleDateString('fr-FR')}</span>
                           </td>
                           <td className="p-2">
                             <div className="flex space-x-1">
@@ -531,6 +520,9 @@ export default function DoctorInterface() {
                               </Button>
                               <Button size="sm" variant="outline">
                                 <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="outline">
+                                <Download className="h-3 w-3" />
                               </Button>
                             </div>
                           </td>
@@ -556,39 +548,17 @@ export default function DoctorInterface() {
                   <p className="font-medium">{selectedAppointment.patient.fullName}</p>
                 </div>
                 <div>
-                  <Label>Date de naissance</Label>
-                  <p className="font-medium">{new Date(selectedAppointment.patient.dateOfBirth).toLocaleDateString('fr-FR')}</p>
-                </div>
-                <div>
-                  <Label>Email</Label>
+                  <Label>Email patient</Label>
                   <p className="font-medium">{selectedAppointment.patient.email}</p>
                 </div>
-                <div>
-                  <Label>Téléphone</Label>
-                  <p className="font-medium">{selectedAppointment.patient.phone || "-"}</p>
-                </div>
-                <div>
-                  <Label>Adresse</Label>
-                  <p className="font-medium">{selectedAppointment.patient.address}</p>
-                </div>
-                <div>
-                  <Label>Groupe sanguin</Label>
-                  <p className="font-medium">{selectedAppointment.patient.bloodType || "-"}</p>
-                </div>
-                {selectedAppointment.patient.allergies && (
-                  <div className="md:col-span-2">
-                    <Label>Allergies</Label>
-                    <p className="font-medium text-red-600">{selectedAppointment.patient.allergies}</p>
-                  </div>
-                )}
-                {selectedAppointment.patient.chronicDiseases && (
-                  <div className="md:col-span-2">
-                    <Label>Maladies chroniques</Label>
-                    <p className="font-medium text-orange-600">{selectedAppointment.patient.chronicDiseases}</p>
+                {selectedAppointment.patient.phone && (
+                  <div>
+                    <Label>Téléphone patient</Label>
+                    <p className="font-medium">{selectedAppointment.patient.phone}</p>
                   </div>
                 )}
                 <div>
-                  <Label>Date du rendez-vous</Label>
+                  <Label>Date</Label>
                   <p className="font-medium">{new Date(selectedAppointment.appointmentDate).toLocaleDateString('fr-FR')}</p>
                 </div>
                 <div>
@@ -603,6 +573,13 @@ export default function DoctorInterface() {
                   <Label>Durée</Label>
                   <p className="font-medium">{selectedAppointment.duration} minutes</p>
                 </div>
+                <div>
+                  <Label>Statut</Label>
+                  <div className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedAppointment.status)}`}>
+                    {getStatusIcon(selectedAppointment.status)}
+                    <span>{getStatusText(selectedAppointment.status)}</span>
+                  </div>
+                </div>
                 {selectedAppointment.reason && (
                   <div className="md:col-span-2">
                     <Label>Motif</Label>
@@ -615,24 +592,48 @@ export default function DoctorInterface() {
                     <p className="font-medium">{selectedAppointment.symptoms}</p>
                   </div>
                 )}
+                {selectedAppointment.notes && (
+                  <div className="md:col-span-2">
+                    <Label>Notes</Label>
+                    <p className="font-medium">{selectedAppointment.notes}</p>
+                  </div>
+                )}
               </div>
               <div className="flex space-x-2 mt-6">
+                {selectedAppointment.status === "SCHEDULED" && (
+                  <Button
+                    onClick={() => updateAppointmentStatus(selectedAppointment.id, "CONFIRMED")}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Confirmer
+                  </Button>
+                )}
                 {selectedAppointment.status === "CONFIRMED" && (
                   <Button
                     onClick={() => updateAppointmentStatus(selectedAppointment.id, "IN_PROGRESS")}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     <AlertCircle className="h-4 w-4 mr-2" />
-                    Démarrer consultation
+                    Démarrer
                   </Button>
                 )}
                 {selectedAppointment.status === "IN_PROGRESS" && (
                   <Button
-                    onClick={() => setShowMedicalRecordForm(true)}
+                    onClick={() => updateAppointmentStatus(selectedAppointment.id, "COMPLETED")}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Créer dossier médical
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Terminer
+                  </Button>
+                )}
+                {(selectedAppointment.status === "SCHEDULED" || selectedAppointment.status === "CONFIRMED") && (
+                  <Button
+                    onClick={() => updateAppointmentStatus(selectedAppointment.id, "CANCELLED")}
+                    variant="destructive"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Annuler
                   </Button>
                 )}
                 <Button
@@ -640,137 +641,6 @@ export default function DoctorInterface() {
                   variant="outline"
                 >
                   Fermer
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {showMedicalRecordForm && selectedAppointment && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Créer un dossier médical</CardTitle>
-              <CardDescription>Patient: {selectedAppointment.patient.fullName}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <Label htmlFor="diagnosis">Diagnostic *</Label>
-                  <Textarea
-                    id="diagnosis"
-                    value={medicalRecordForm.diagnosis}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, diagnosis: e.target.value }))}
-                    placeholder="Décrivez le diagnostic..."
-                    rows={3}
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="treatment">Traitement</Label>
-                  <Textarea
-                    id="treatment"
-                    value={medicalRecordForm.treatment}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, treatment: e.target.value }))}
-                    placeholder="Décrivez le traitement recommandé..."
-                    rows={2}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="prescription">Prescription</Label>
-                  <Textarea
-                    id="prescription"
-                    value={medicalRecordForm.prescription}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, prescription: e.target.value }))}
-                    placeholder="Médicaments prescrits..."
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="bloodPressure">Pression artérielle</Label>
-                  <Input
-                    id="bloodPressure"
-                    value={medicalRecordForm.bloodPressure}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, bloodPressure: e.target.value }))}
-                    placeholder="120/80"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="heartRate">Fréquence cardiaque (bpm)</Label>
-                  <Input
-                    id="heartRate"
-                    type="number"
-                    value={medicalRecordForm.heartRate}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, heartRate: e.target.value }))}
-                    placeholder="72"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="temperature">Température (°C)</Label>
-                  <Input
-                    id="temperature"
-                    type="number"
-                    step="0.1"
-                    value={medicalRecordForm.temperature}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, temperature: e.target.value }))}
-                    placeholder="37.0"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="weight">Poids (kg)</Label>
-                  <Input
-                    id="weight"
-                    type="number"
-                    step="0.1"
-                    value={medicalRecordForm.weight}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, weight: e.target.value }))}
-                    placeholder="70.0"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="height">Taille (cm)</Label>
-                  <Input
-                    id="height"
-                    type="number"
-                    value={medicalRecordForm.height}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, height: e.target.value }))}
-                    placeholder="175"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="observations">Observations</Label>
-                  <Textarea
-                    id="observations"
-                    value={medicalRecordForm.observations}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, observations: e.target.value }))}
-                    placeholder="Observations supplémentaires..."
-                    rows={2}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="recommendations">Recommandations</Label>
-                  <Textarea
-                    id="recommendations"
-                    value={medicalRecordForm.recommendations}
-                    onChange={(e) => setMedicalRecordForm(prev => ({ ...prev, recommendations: e.target.value }))}
-                    placeholder="Recommandations pour le patient..."
-                    rows={2}
-                  />
-                </div>
-              </div>
-              <div className="flex space-x-2 mt-6">
-                <Button
-                  onClick={() => createMedicalRecord(selectedAppointment.id)}
-                  className="bg-green-600 hover:bg-green-700"
-                  disabled={!medicalRecordForm.diagnosis}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Enregistrer et terminer consultation
-                </Button>
-                <Button
-                  onClick={() => setShowMedicalRecordForm(false)}
-                  variant="outline"
-                >
-                  Annuler
                 </Button>
               </div>
             </CardContent>
