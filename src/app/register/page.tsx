@@ -60,78 +60,20 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-teal-100 flex items-center justify-center px-4">
-      <div className="max-w-5xl w-full grid gap-8 md:grid-cols-[1.2fr,1fr] items-center">
-        {/* Section gauche - Informations */}
-        <section className="space-y-6">
-          <div className="space-y-2">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">
-              Créez votre compte
-            </p>
-            <h1 className="text-4xl font-bold text-gray-900 leading-tight">
-              Rejoignez votre <span className="text-emerald-600">clinique</span> en quelques étapes
-            </h1>
-            <p className="text-gray-600 text-lg">
-              Inscrivez-vous en tant que patient, médecin ou réceptionniste. Les administrateurs peuvent ajouter du personnel supplémentaire depuis le panneau d&apos;administration.
-            </p>
-          </div>
-          
-          <div className="space-y-4">
-            <h3 className="font-semibold text-gray-800">Comment ça marche ?</h3>
-            <div className="space-y-4">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-emerald-700 font-semibold text-sm">1</span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-800">Remplissez votre profil</p>
-                  <p className="text-gray-600 text-sm">Informations de contact pour que la clinique puisse vous joindre.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-emerald-700 font-semibold text-sm">2</span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-800">Choisissez votre rôle</p>
-                  <p className="text-gray-600 text-sm">Patient, médecin ou réceptionniste - chacun a un tableau de bord personnalisé.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-emerald-700 font-semibold text-sm">3</span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-800">Gérez vos visites</p>
-                  <p className="text-gray-600 text-sm">Prenez ou gérez des rendez-vous dès que votre compte est activé.</p>
-                </div>
-              </div>
+    <main className="min-h-screen bg-linear-to-br from-slate-50 to-gray-100 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <section className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-linear-to-r from-emerald-500 to-teal-600 rounded-full mb-4">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
             </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Inscription</h1>
+            <p className="text-gray-600 text-sm">Créez votre compte clinique</p>
           </div>
 
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-linear-to-r from-emerald-400 to-teal-400 flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-800">Sécurité garantie</p>
-                <p className="text-sm text-gray-600">Vos données médicales sont protégées et confidentielles</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Section droite - Formulaire */}
-        <section className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl border border-gray-100 p-8">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Inscription</h2>
-            <p className="text-gray-600 text-sm">Créez votre compte pour accéder à la plateforme</p>
-          </div>
-
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
@@ -257,16 +199,16 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-linear-to-r from-emerald-600 to-teal-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-lg"
+              className="w-full bg-linear-to-r from-emerald-600 to-teal-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               {loading ? "Création du compte..." : "Créer mon compte"}
             </button>
           </form>
 
-          <div className="mt-8 text-center">
+          <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Déjà inscrit ?{" "}
-              <Link href="/login" className="text-emerald-600 font-semibold hover:text-emerald-700">
+              <Link href="/login" className="text-emerald-600 font-semibold hover:text-emerald-700 transition-colors">
                 Se connecter
               </Link>
             </p>

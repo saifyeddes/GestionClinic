@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Calendar, Clock, User, Phone, Mail, Stethoscope, Search, Edit, Trash2, Eye, CheckCircle, XCircle, AlertCircle, Users, BarChart3, Shield, Plus, RefreshCw, Building, Settings, Activity, FileText, TrendingUp, UserCheck, CalendarDays, CreditCard, Download, Heart, ClipboardList, Pill } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { User, Phone, Mail, Stethoscope, Search, Edit, Eye, CheckCircle, XCircle, AlertCircle, Users, Plus, RefreshCw, Activity, FileText, TrendingUp, UserCheck, CalendarDays, Download, Heart, ClipboardList, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 
 interface Appointment {
   id: string
@@ -55,16 +55,42 @@ interface MedicalRecord {
   }
 }
 
+interface Patient {
+  id: string
+  fullName: string
+  email: string
+  phone?: string
+  dateOfBirth: string
+  address: string
+  emergencyContact?: string
+  emergencyPhone?: string
+  bloodType?: string
+  allergies?: string
+  chronicDiseases?: string
+  isActive: boolean
+  user: {
+    id: string
+    email: string
+    fullName: string
+  }
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
 
 export default function DoctorInterface() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([])
+  const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
-  const [doctorInfo, setDoctorInfo] = useState<any>(null)
+  const [doctorInfo, setDoctorInfo] = useState<{
+    id: string
+    fullName: string
+    email: string
+    specialization?: string
+  } | null>(null)
   const [stats, setStats] = useState({
     todayAppointments: 0,
     completedAppointments: 0,
@@ -72,11 +98,7 @@ export default function DoctorInterface() {
     upcomingAppointments: 0
   })
 
-  useEffect(() => {
-    fetchDoctorData()
-  }, [])
-
-  const fetchDoctorData = async () => {
+  const fetchDoctorData = useCallback(async () => {
     try {
       const token = localStorage.getItem("clinic_token")
       if (!token) return
@@ -107,12 +129,19 @@ export default function DoctorInterface() {
         setMedicalRecords(recordsData)
       }
 
+      // Get patients
+      const patientsRes = await fetch(`${API_URL}/patients`, { headers })
+      if (patientsRes.ok) {
+        const patientsData = await patientsRes.json()
+        setPatients(patientsData)
+      }
+
       // Calculate stats
       const today = new Date().toISOString().split('T')[0]
       const todayAppointments = appointments.filter(apt => apt.appointmentDate.startsWith(today)).length
       const completedAppointments = appointments.filter(apt => apt.status === 'COMPLETED').length
       const upcomingAppointments = appointments.filter(apt => apt.status === 'SCHEDULED' || apt.status === 'CONFIRMED').length
-      const uniquePatients = new Set(appointments.map(apt => apt.patient.id)).size
+      const uniquePatients = patients.length
 
       setStats({
         todayAppointments,
@@ -125,12 +154,22 @@ export default function DoctorInterface() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [appointments, patients.length])
+
+  useEffect(() => {
+    fetchDoctorData()
+  }, [fetchDoctorData])
 
   const filteredAppointments = appointments.filter((appointment) => {
-    const matchesSearch = appointment.patient.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.patient.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.patient.phone?.includes(searchTerm)
+    const search = searchTerm.toLowerCase()
+    const patientFullName = appointment.patient?.fullName?.toLowerCase() ?? ""
+    const patientEmail = appointment.patient?.email?.toLowerCase() ?? ""
+    const patientPhone = appointment.patient?.phone ?? ""
+    const matchesSearch =
+      search === "" ||
+      patientFullName.includes(search) ||
+      patientEmail.includes(search) ||
+      patientPhone.includes(searchTerm)
     const matchesStatus = statusFilter === "all" || appointment.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -264,7 +303,7 @@ export default function DoctorInterface() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-emerald-100 text-sm">Rendez-vous Aujourd'hui</p>
+                  <p className="text-emerald-100 text-sm">Rendez-vous Aujourd&apos;hui</p>
                   <p className="text-3xl font-bold mt-1">{stats.todayAppointments}</p>
                 </div>
                 <CalendarDays className="h-10 w-10 text-emerald-200" />
@@ -327,9 +366,11 @@ export default function DoctorInterface() {
 
         {/* Onglets de gestion médicale */}
         <Tabs defaultValue="appointments" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="appointments">Rendez-vous</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="appointments">Agenda</TabsTrigger>
             <TabsTrigger value="records">Dossiers médicaux</TabsTrigger>
+            <TabsTrigger value="prescriptions">Ordonnances</TabsTrigger>
+            <TabsTrigger value="patients">Patients</TabsTrigger>
           </TabsList>
 
           <TabsContent value="appointments" className="space-y-6">
@@ -465,13 +506,100 @@ export default function DoctorInterface() {
             </Card>
           </TabsContent>
 
+          {/* Onglet Patients */}
+          <TabsContent value="patients" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      Mes Patients
+                    </CardTitle>
+                    <CardDescription>Consultez les informations de vos patients</CardDescription>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Rechercher un patient..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {patients.filter((patient) => {
+                    const search = searchTerm.toLowerCase()
+                    const fullName = patient.fullName?.toLowerCase() ?? ""
+                    const email = (patient.email ?? patient.user?.email ?? "").toLowerCase()
+                    if (search === "") return true
+                    return fullName.includes(search) || email.includes(search)
+                  }).map((patient) => (
+                    <Card key={patient.id} className="border-emerald-100 hover:shadow-md transition-all cursor-pointer">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="bg-emerald-100 p-2 rounded-full">
+                              <User className="h-5 w-5 text-emerald-600" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{patient.fullName}</h4>
+                              <p className="text-sm text-gray-600">{patient.user.email}</p>
+                            </div>
+                          </div>
+                          <Badge className={patient.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                            {patient.isActive ? "Actif" : "Inactif"}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="space-y-2">
+                          {patient.phone && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Phone className="h-4 w-4 mr-2" />
+                              {patient.phone}
+                            </div>
+                          )}
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="h-4 w-4 mr-2" />
+                            {patient.user.email}
+                          </div>
+                          {patient.address && (
+                            <div className="flex items-center text-sm text-gray-600">
+                              <MapPin className="h-4 w-4 mr-2" />
+                              {patient.address}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-2 pt-3 border-t">
+                          <Button size="sm" variant="outline" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50">
+                            <Eye className="h-3 w-3 mr-1" />
+                            Détails
+                          </Button>
+                          <Button size="sm" variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50">
+                            <FileText className="h-3 w-3 mr-1" />
+                            Dossier
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="records" className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Dossiers Médicaux</CardTitle>
-                    <CardDescription>Consultez et gérez les dossiers patients</CardDescription>
+                    <CardDescription>Consultez et gérez l&apos;historique clinique de vos patients</CardDescription>
                   </div>
                   <Button className="bg-emerald-600 hover:bg-emerald-700">
                     <Plus className="h-4 w-4 mr-2" />
@@ -520,6 +648,65 @@ export default function DoctorInterface() {
                               </Button>
                               <Button size="sm" variant="outline">
                                 <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button size="sm" variant="outline">
+                                <Download className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="prescriptions" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Ordonnances</CardTitle>
+                    <CardDescription>Visualisez les ordonnances émises pour vos patients</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Patient</th>
+                        <th className="text-left p-2">Diagnostic</th>
+                        <th className="text-left p-2">Ordonnance</th>
+                        <th className="text-left p-2">Date</th>
+                        <th className="text-left p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {medicalRecords.filter((record) => record.prescription).map((record) => (
+                        <tr key={record.id} className="border-b hover:bg-gray-50">
+                          <td className="p-2">
+                            <div className="flex items-center space-x-2">
+                              <User className="h-4 w-4 text-gray-400" />
+                              <span className="font-medium">{record.patient.fullName}</span>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <span className="text-sm truncate max-w-32 block">{record.diagnosis}</span>
+                          </td>
+                          <td className="p-2">
+                            <span className="text-sm truncate max-w-48 block">{record.prescription}</span>
+                          </td>
+                          <td className="p-2">
+                            <span className="text-sm text-gray-500">{new Date(record.createdAt).toLocaleDateString('fr-FR')}</span>
+                          </td>
+                          <td className="p-2">
+                            <div className="flex space-x-1">
+                              <Button size="sm" variant="outline">
+                                <Eye className="h-3 w-3" />
                               </Button>
                               <Button size="sm" variant="outline">
                                 <Download className="h-3 w-3" />
