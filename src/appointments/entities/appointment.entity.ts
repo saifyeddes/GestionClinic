@@ -28,6 +28,12 @@ export enum AppointmentType {
   CHECK_UP = 'CHECK_UP',
 }
 
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  REFUNDED = 'REFUNDED',
+}
+
 @Entity()
 export class Appointment {
   @PrimaryGeneratedColumn('uuid')
@@ -53,6 +59,12 @@ export class Appointment {
 
   @Column({ default: 30 })
   duration: number; // in minutes
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 50 })
+  price: number; // consultation price (default currency)
+
+  @Column({ type: 'varchar', default: PaymentStatus.PENDING })
+  paymentStatus: PaymentStatus; // PENDING, PAID, REFUNDED
 
   @ManyToOne(() => User, (doctor) => doctor.appointments)
   @JoinColumn({ name: 'doctorId' })

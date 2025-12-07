@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Patient } from './entities/patient.entity';
@@ -38,10 +38,16 @@ export class PatientsService {
   }
 
   async update(id: string, updateData: Partial<Patient>): Promise<Patient> {
-    await this.patientRepository.update(id, updateData);
+    try {
+      await this.patientRepository.update(id, updateData);
+    } catch (err) {
+      // Could be a DB error (invalid value, constraint, etc.)
+      throw new BadRequestException('Failed to update patient', err?.message);
+    }
+
     const updated = await this.findOne(id);
     if (!updated) {
-      throw new Error('Patient not found');
+      throw new NotFoundException('Patient not found');
     }
     return updated;
   }

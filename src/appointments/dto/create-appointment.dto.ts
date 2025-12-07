@@ -28,6 +28,14 @@ export class CreateAppointmentDto {
   @IsNumber()
   duration?: number;
 
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string;
+
   @IsString()
   doctorId: string;
 
