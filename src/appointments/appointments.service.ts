@@ -17,7 +17,7 @@ export class AppointmentsService {
 
   async findAll(): Promise<Appointment[]> {
     return this.appointmentRepository.find({
-      relations: ['doctor', 'patient', 'createdBy'],
+      relations: ['doctor', 'patient', 'patient.user', 'createdBy'],
       order: { appointmentDate: 'ASC' },
     });
   }
@@ -25,7 +25,7 @@ export class AppointmentsService {
   async findByDoctor(doctorId: string): Promise<Appointment[]> {
     return this.appointmentRepository.find({
       where: { doctorId },
-      relations: ['patient', 'createdBy'],
+      relations: ['patient', 'patient.user', 'createdBy'],
       order: { appointmentDate: 'ASC' },
     });
   }
@@ -33,7 +33,7 @@ export class AppointmentsService {
   async findByPatient(patientId: string): Promise<Appointment[]> {
     return this.appointmentRepository.find({
       where: { patientId },
-      relations: ['doctor', 'createdBy'],
+      relations: ['doctor', 'patient', 'patient.user', 'createdBy'],
       order: { appointmentDate: 'ASC' },
     });
   }
@@ -43,7 +43,7 @@ export class AppointmentsService {
       where: {
         appointmentDate: Between(startDate, endDate),
       },
-      relations: ['doctor', 'patient'],
+      relations: ['doctor', 'patient', 'patient.user'],
       order: { appointmentDate: 'ASC' },
     });
   }
@@ -51,7 +51,7 @@ export class AppointmentsService {
   async findOne(id: string): Promise<Appointment | null> {
     return this.appointmentRepository.findOne({
       where: { id },
-      relations: ['doctor', 'patient', 'createdBy'],
+      relations: ['doctor', 'patient', 'patient.user', 'createdBy'],
     });
   }
 
@@ -86,7 +86,7 @@ export class AppointmentsService {
       where: {
         appointmentDate: Between(startOfDay, endOfDay),
       },
-      relations: ['doctor', 'patient'],
+      relations: ['doctor', 'patient', 'patient.user'],
       order: { appointmentDate: 'ASC' },
     });
   }

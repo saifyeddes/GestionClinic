@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   OneToOne,
   OneToMany,
+  JoinColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Appointment } from '../../appointments/entities/appointment.entity';
@@ -44,6 +45,7 @@ export class Patient {
   isActive: boolean;
 
   @OneToOne(() => User, user => user.patient)
+  @JoinColumn()
   user: User;
 
   @OneToMany(() => Appointment, appointment => appointment.patient)

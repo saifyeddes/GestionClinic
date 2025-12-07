@@ -32,8 +32,11 @@ export class CreateAppointmentDto {
   doctorId: string;
 
   @IsString()
-  patientId: string;
-
+  @IsOptional()
   @IsString()
-  createdById: string;
+  patientId?: string;
+
+  @IsOptional()
+  @IsString()
+  createdById?: string;
 }

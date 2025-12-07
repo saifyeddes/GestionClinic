@@ -22,6 +22,19 @@ import { UserStatus } from '../common/enums/user-status.enum';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('doctors')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR, UserRole.PATIENT)
+  async getDoctors() {
+    const users = await this.usersService.findAll({ role: UserRole.DOCTOR });
+    return users.map((u) => ({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      specialization: u.specialization,
+      phone: u.phone,
+    }));
+  }
+
   @Get()
   @Roles(UserRole.ADMIN)
   async findAll(
