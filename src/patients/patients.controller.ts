@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { RegisterPatientDto } from './dto/register-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -21,6 +22,12 @@ import { UserRole } from '../common/enums/user-role.enum';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
+
+  @Post('register')
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  registerWithUser(@Body() registerPatientDto: RegisterPatientDto) {
+    return this.patientsService.registerWithUser(registerPatientDto);
+  }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)

@@ -261,17 +261,20 @@ export class AppointmentsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR)
-  update(@Param('id') id: string, @Body() updateAppointmentDto: UpdateAppointmentDto) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.DOCTOR, UserRole.PATIENT)
+  update(@Param('id') id: string, @Body() updateAppointmentDto: any) {
     // Convert string date to Date object if present
     const updateData: Partial<Appointment> = {};
     
-    // Copy all properties from DTO
+    // Copy all properties from DTO, including status and paymentStatus
     Object.keys(updateAppointmentDto).forEach(key => {
-      const value = updateAppointmentDto[key as keyof UpdateAppointmentDto];
-      if (value !== undefined) {
+      const value = updateAppointmentDto[key];
+      if (value !== undefined && value !== null) {
         if (key === 'appointmentDate' && typeof value === 'string') {
-          updateData[key] = new Date(value);
+          updateData[key as keyof Appointment] = new Date(value) as any;
+        } else if (key === 'status' || key === 'paymentStatus') {
+          updateData[key as keyof Appointment] = value as any;
         } else {
           updateData[key as keyof Appointment] = value as any;
         }
@@ -282,12 +285,16 @@ export class AppointmentsController {
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.PATIENT)
   updateStatus(
     @Param('id') id: string,
-    @Body('status') status: AppointmentStatus,
+    @Body() body: { status?: AppointmentStatus; paymentStatus?: PaymentStatus },
   ) {
-    return this.appointmentsService.updateStatus(id, status);
+    const updateData: Partial<Appointment> = {};
+    if (body.status) updateData.status = body.status;
+    if (body.paymentStatus) updateData.paymentStatus = body.paymentStatus;
+    return this.appointmentsService.update(id, updateData);
   }
 
   @Delete(':id')

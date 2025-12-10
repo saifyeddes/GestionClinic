@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Query,
   Body,
   Patch,
@@ -8,6 +9,7 @@ import {
   Param,
   UseGuards,
   ParseEnumPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -16,6 +18,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { User } from './entities/user.entity';
 import { UserRole } from '../common/enums/user-role.enum';
 import { UserStatus } from '../common/enums/user-status.enum';
+import * as bcrypt from 'bcrypt';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -33,6 +36,44 @@ export class UsersController {
       specialization: u.specialization,
       phone: u.phone,
     }));
+  }
+
+  @Post()
+  @Roles(UserRole.ADMIN)
+  async create(
+    @Body() createUserData: { fullName: string; email: string; password: string; role: UserRole; status?: UserStatus },
+  ) {
+    // prevent duplicate email insertion with a friendly error
+    const existing = await this.usersService.findByEmail(createUserData.email);
+    if (existing) {
+      throw new BadRequestException('Email already in use');
+    }
+
+    if (!createUserData.password || createUserData.password.length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters');
+    }
+
+    const passwordHash = await bcrypt.hash(createUserData.password, 10);
+
+    const user = await this.usersService.create({
+      fullName: createUserData.fullName,
+      email: createUserData.email,
+      passwordHash,
+      role: createUserData.role,
+      status: createUserData.status || UserStatus.ACTIVE,
+    });
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      phone: user.phone,
+      specialization: user.specialization,
+      licenseNumber: user.licenseNumber,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
   }
 
   @Get()
